@@ -37,7 +37,32 @@ module.exports = function (app, swig) {
 
     });
 
+    app.get('/autores/filtrar/:rol', function(req, res){
+        let autores = [{
+            "nombre": "Katrina Leskanich",
+            "grupo": "Katrina and the Waves",
+            "rol": "Cantante"
+        }, {
+            "nombre": "Don Henley",
+            "grupo": "The Eagles",
+            "rol": "Bateria"
+        }, {
+            "nombre": "John Levén",
+            "grupo": "Europe",
+            "rol": "Bajista"
+        }];
+
+        let autoresfiltrados = autores.filter(autor => autor.rol.toLowerCase() === req.params.rol.toLowerCase());
+
+        let respuesta = swig.renderFile('views/autores.html', {
+                autores: autoresfiltrados
+            }
+        );
+        res.send(respuesta);
+    });
+
     app.get('/autores*', function (req, res) {
         res.redirect('/autores/');
-    })
+    });
+
 };
