@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titulo %} Error {% endblock %}
+{% block contenido_principal
+<div class="row">
+    <div class="media col-xs-10">
+        <div>
+            <h2>Parece que ha habido un error...</h2>
+        </div>
+        <div class="media-body">
+            <p> {{ error }} </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
