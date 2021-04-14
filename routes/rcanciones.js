@@ -138,23 +138,27 @@ module.exports = function(app, swig, gestorBD) {
             if ( canciones == null ){
                 res.send("Error al recuperar la canción.");
             } else {
-                gestorBD.obtenerComentarios(cancion_id, function(comentariosCancion){
-                    if(comentariosCancion == null){
-                        let comentariosCancion = [];
-                        let respuesta = swig.renderFile('views/bcancion.html',
-                            {
-                                cancion : canciones[0],
-                                comentarios: comentariosCancion
-                            });
-                        res.send(respuesta);
-                    } else{
-                        let respuesta = swig.renderFile('views/bcancion.html',
-                            {
-                                cancion : canciones[0],
-                                comentarios: comentariosCancion
-                            });
-                        res.send(respuesta);
-                    }
+                cancionDisponible(req.session.usuario, canciones[0], cancion_id, function(enPropiedad){
+                    gestorBD.obtenerComentarios(cancion_id, function(comentariosCancion){
+                        if(comentariosCancion == null){
+                            let comentariosCancion = [];
+                            let respuesta = swig.renderFile('views/bcancion.html',
+                                {
+                                    cancion : canciones[0],
+                                    comprada: enPropiedad,
+                                    comentarios: comentariosCancion
+                                });
+                            res.send(respuesta);
+                        } else{
+                            let respuesta = swig.renderFile('views/bcancion.html',
+                                {
+                                    cancion : canciones[0],
+                                    comprada: enPropiedad,
+                                    comentarios: comentariosCancion
+                                });
+                            res.send(respuesta);
+                        }
+                    });
                 });
             }
         });
@@ -219,12 +223,25 @@ module.exports = function(app, swig, gestorBD) {
             usuario : req.session.usuario,
             cancionId : cancionId
         }
-        gestorBD.insertarCompra(compra ,function(idCompra){
-            if ( idCompra == null ){
-                res.send(respuesta);
-            } else {
-                res.redirect("/compras");
-            }
+
+        gestorBD.obtenerCanciones(cancionId, function(canciones){
+            cancionDisponible(req.session.usuario, canciones[0], cancionId, function(comprada){
+                if(comprada == false) {
+                    gestorBD.insertarCompra(compra, function (idCompra) {
+                        if (idCompra == null) {
+                            res.send(respuesta);
+                        } else {
+                            res.redirect("/compras");
+                        }
+                    });
+                } else {
+                    let respuesta = swig.renderFile('views/error.html',
+                        {
+                            error: "La canción ya está en propiedad",
+                        });
+                    res.send(respuesta);
+                }
+            });
         });
     });
 
@@ -279,4 +296,19 @@ module.exports = function(app, swig, gestorBD) {
             callback(true); // FIN
         }
     };
+
+    function cancionDisponible(usuario, cancion, cancionId, callback){
+        //Primero comprobamos que no es el autor
+        if (cancion.autor == usuario) {
+            callback(true);//false = no en propiedad, true = en propiedad
+        } else { //Ahora comprobamos que no ha comprado la canción
+            gestorBD.obtenerCompras({cancionId, usuario} , function(canciones){
+                if(canciones.length < 1){ //si no ha comprado canciones...
+                    callback(false);
+                } else { //si ha comprado canciones...
+                    callback(true);
+                }
+            });
+        }
+    }
 };
