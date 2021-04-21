@@ -33,15 +33,24 @@ module.exports = function(app, gestorBD) {
     app.delete("/api/cancion/:id", function(req, res) {
         let criterio = { "_id" : gestorBD.mongo.ObjectID(req.params.id)}
 
-        gestorBD.eliminarCancion(criterio,function(canciones){
-            if ( canciones == null ){
-                res.status(500);
-                res.json({
-                    error : "se ha producido un error"
-                })
-            } else {
-                res.status(200);
-                res.send( JSON.stringify(canciones) );
+
+        cancionDisponible(req.session.usuario, gestorBD.mongo.ObjectID(req.params.id), function(esAutor){
+            if(esAutor==true){
+                gestorBD.eliminarCancion(criterio,function(canciones){
+                    if ( canciones == null ){
+                        res.status(500);
+                        res.json({
+                            error : "se ha producido un error"
+                        })
+                    } else {
+                        res.status(200);
+                        res.send( JSON.stringify(canciones) );
+                    }
+                });
+            }
+            else {
+                res.status(403);
+                res.json({error: "no tiene permisos para modificar la canción"})
             }
         });
     });
@@ -53,22 +62,27 @@ module.exports = function(app, gestorBD) {
             precio : req.body.precio,
         }
         // ¿Validar nombre, genero, precio?
+        let errors = validateData(cancion);
+        if(errors.length <= 0) {
+            gestorBD.insertarCancion(cancion, function(id){
+                if (id == null) {
+                    res.status(500);
+                    res.json({
+                        error : "se ha producido un error"
+                    })
+                } else {
+                    res.status(201);
+                    res.json({
+                        mensaje : "canción insertada",
+                        _id : id
+                    })
+                }
 
-        gestorBD.insertarCancion(cancion, function(id){
-            if (id == null) {
-                res.status(500);
-                res.json({
-                    error : "se ha producido un error"
-                })
-            } else {
-                res.status(201);
-                res.json({
-                    mensaje : "canción insertada",
-                    _id : id
-                })
-            }
-        });
-
+            });
+        } else{
+            res.status(400);
+            res.json({error: errors});
+        }
     });
 
 
@@ -83,18 +97,32 @@ module.exports = function(app, gestorBD) {
             cancion.genero = req.body.genero;
         if ( req.body.precio != null)
             cancion.precio = req.body.precio;
-        gestorBD.modificarCancion(criterio, cancion, function(result) {
-            if (result == null) {
-                res.status(500);
-                res.json({
-                    error : "se ha producido un error"
-                })
+
+        cancionDisponible(req.session.usuario, gestorBD.mongo.ObjectID(req.params.id), function(esAutor){
+            if(esAutor==true) {
+                let errors = validateData(cancion);
+                if(errors.length <= 0) {
+                    gestorBD.modificarCancion(criterio, cancion, function (result) {
+                        if (result == null) {
+                            res.status(500);
+                            res.json({
+                                error: "se ha producido un error"
+                            })
+                        } else {
+                            res.status(200);
+                            res.json({
+                                mensaje: "canción modificada",
+                                _id: req.params.id
+                            })
+                        }
+                    });
+                }else{
+                    res.status(400);
+                    res.json({error: errors});
+                }
             } else {
-                res.status(200);
-                res.json({
-                    mensaje : "canción modificada",
-                    _id : req.params.id
-                })
+                res.status(403);
+                res.json({error: "no tiene permisos para modificar la canción"})
             }
         });
     });
@@ -123,4 +151,29 @@ module.exports = function(app, gestorBD) {
             }
         })
     });
+
+    function cancionDisponible(usuario, cancionId, callback){
+        let criterio = {"_id": cancionId}
+        gestorBD.obtenerCanciones( criterio, function(canciones){
+            if (canciones[0].autor == usuario){
+                callback(true);
+            } else {
+                callback(false);
+            }
+        });
+    }
+
+    function validateData(cancion){
+        let errors = new Array();
+        if (cancion.nombre === null || typeof cancion.nombre === 'undefined' || cancion.nombre === "" || cancion.nombre.length > 20)
+            errors.push("El nombre de la canción es incorrecto")
+
+        if (cancion.genero === null || typeof cancion.genero === 'undefined' || cancion.genero === "")
+            errors.push("El género de la canción no puede  estar vacio")
+
+        if (cancion.precio === null || typeof cancion.precio === 'undefined' || cancion.precio < 0 || cancion.precio === "")
+            errors.push("El precio de la canción no puede ser negativo")
+
+        return errors;
+    }
 }
